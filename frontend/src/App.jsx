@@ -1,230 +1,259 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
+import ChatMessage from './components/ChatMessage'
+import MessageInput from './components/MessageInput'
+import PropertyRecommendations from './components/PropertyRecommendations'
+import { sendMessage, uploadPDF } from './services/api'
 
 function App() {
-  const [prefectures, setPrefectures] = useState([])
-  const [selectedPrefecture, setSelectedPrefecture] = useState('')
-  const [stations, setStations] = useState([])
-  const [selectedStation, setSelectedStation] = useState('')
-  const [properties, setProperties] = useState([])
-  const [searchResult, setSearchResult] = useState(null)
+  const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [step, setStep] = useState(1) // 1: 都道府県選択, 2: 駅選択, 3: 結果表示
+  const [sessionId, setSessionId] = useState(null)
+  const [recommendations, setRecommendations] = useState([])
+  const [recommendationCount, setRecommendationCount] = useState(3)
+  const [totalPropertyCount, setTotalPropertyCount] = useState(null)
+  const [filteredPropertyCount, setFilteredPropertyCount] = useState(null)
+  const messagesEndRef = useRef(null)
 
-  // 都道府県一覧を取得
+  // 初期メッセージとデータベース統計取得
   useEffect(() => {
-    fetchPrefectures()
+    setMessages([
+      {
+        id: 'welcome',
+        type: 'assistant',
+        content: 'こんにちは！SumaiAgentです。🏠\n\nご希望の物件について教えてください。例えば：\n• 「新宿駅周辺で3000万円以下のマンション」\n• 「横浜市内で築浅の4LDK」\n• PDFファイルをアップロード\n\nどのようにお手伝いしましょうか？',
+        timestamp: new Date().toISOString()
+      }
+    ])
+
+    // データベース統計を取得
+    fetchDatabaseStats()
   }, [])
 
-  const fetchPrefectures = async () => {
+  const fetchDatabaseStats = async () => {
     try {
-      const response = await fetch('http://localhost:8001/prefectures')
+      const response = await fetch('/api/database/stats')
       const data = await response.json()
-      setPrefectures(data.prefectures)
+      setTotalPropertyCount(data.total_properties)
     } catch (error) {
-      console.error('都道府県の取得に失敗:', error)
+      console.error('Failed to fetch database stats:', error)
+      setTotalPropertyCount(640736) // フォールバック値
     }
   }
 
-  // 都道府県選択時の処理
-  const handlePrefectureSelect = async (prefecture) => {
-    setSelectedPrefecture(prefecture)
-    setIsLoading(true)
-    
-    try {
-      const response = await fetch(`http://localhost:8001/stations/${encodeURIComponent(prefecture)}`)
-      const data = await response.json()
-      setStations(data.stations)
-      setStep(2)
-    } catch (error) {
-      console.error('駅の取得に失敗:', error)
-    } finally {
-      setIsLoading(false)
-    }
+  // メッセージ送信時に最下部へスクロール
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  // 駅選択時の処理
-  const handleStationSelect = async (stationName) => {
-    setSelectedStation(stationName)
+  const handleSendMessage = async (message) => {
+    if (!message.trim() || isLoading) return
+
+    const userMessage = {
+      id: Date.now() + '_user',
+      type: 'user',
+      content: message,
+      timestamp: new Date().toISOString()
+    }
+
+    setMessages(prev => [...prev, userMessage])
     setIsLoading(true)
 
     try {
-      const formData = new FormData()
-      formData.append('prefecture', selectedPrefecture)
-      formData.append('station', stationName)
-      formData.append('limit', '20')
-
-      const response = await fetch('http://localhost:8001/search', {
-        method: 'POST',
-        body: formData
+      const response = await sendMessage({
+        message,
+        session_id: sessionId,
+        recommendation_count: recommendationCount
       })
 
-      const result = await response.json()
-      if (result.success) {
-        setSearchResult(result.data)
-        setProperties(result.data.properties)
-        setStep(3)
+      // セッションIDを更新
+      if (response.session_id && !sessionId) {
+        setSessionId(response.session_id)
       }
+
+      // アシスタントのレスポンス
+      const assistantMessage = {
+        id: Date.now() + '_assistant',
+        type: 'assistant',
+        content: response.response,
+        timestamp: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+
+      // 推薦結果があれば表示
+      if (response.recommendations && response.recommendations.length > 0) {
+        setRecommendations(response.recommendations)
+      }
+
+      // 絞り込み件数を更新
+      if (response.filtered_count !== undefined) {
+        setFilteredPropertyCount(response.filtered_count)
+      }
+
     } catch (error) {
-      console.error('物件検索に失敗:', error)
+      console.error('Message send error:', error)
+      
+      const errorMessage = {
+        id: Date.now() + '_error',
+        type: 'assistant',
+        content: 'メッセージの送信中にエラーが発生しました。もう一度お試しください。',
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
   }
 
-  // リセット処理
-  const handleReset = () => {
-    setSelectedPrefecture('')
-    setSelectedStation('')
-    setStations([])
-    setProperties([])
-    setSearchResult(null)
-    setStep(1)
+  const handleFileUpload = async (file) => {
+    if (!file || isLoading) return
+
+    const userMessage = {
+      id: Date.now() + '_file',
+      type: 'user',
+      content: `📄 ${file.name} をアップロードしました`,
+      timestamp: new Date().toISOString()
+    }
+
+    setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
+
+    try {
+      const response = await uploadPDF(file, sessionId, recommendationCount)
+
+      // セッションIDを更新
+      if (response.session_id && !sessionId) {
+        setSessionId(response.session_id)
+      }
+
+      // アシスタントのレスポンス
+      const assistantMessage = {
+        id: Date.now() + '_assistant',
+        type: 'assistant',
+        content: response.message,
+        timestamp: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, assistantMessage])
+
+      // 推薦結果があれば表示
+      if (response.recommendations && response.recommendations.length > 0) {
+        setRecommendations(response.recommendations)
+      }
+
+      // 絞り込み件数を更新
+      if (response.filtered_count !== undefined) {
+        setFilteredPropertyCount(response.filtered_count)
+      }
+
+    } catch (error) {
+      console.error('File upload error:', error)
+      
+      const errorMessage = {
+        id: Date.now() + '_error',
+        type: 'assistant',
+        content: 'ファイルのアップロード中にエラーが発生しました。PDFファイルかご確認の上、もう一度お試しください。',
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleBack = () => {
-    if (step === 3) {
-      setStep(2)
-      setProperties([])
-      setSearchResult(null)
-    } else if (step === 2) {
-      setStep(1)
-      setStations([])
-      setSelectedPrefecture('')
-    }
+  const handleNewChat = () => {
+    setMessages([
+      {
+        id: 'welcome',
+        type: 'assistant',
+        content: 'こんにちは！SumaiAgentです。🏠\n\nご希望の物件について教えてください。例えば：\n• 「新宿駅周辺で1K、予算10万円以下」\n• 「横浜市内で築浅の2LDK」\n• PDFファイルをアップロード\n\nどのようにお手伝いしましょうか？',
+        timestamp: new Date().toISOString()
+      }
+    ])
+    setSessionId(null)
+    setRecommendations([])
   }
 
   return (
-    <div className="app-container">
-      <header className="header">
-        <h1>🏠 都道府県別物件検索</h1>
-        <p>まず都道府県を選択し、次に駅を選択してください</p>
+    <div className="app">
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-content">
+          <h1 className="app-title">
+            SumaiAgent
+            {(filteredPropertyCount !== null || totalPropertyCount) && (
+              <span className="property-count">
+                &lt;{(filteredPropertyCount !== null ? filteredPropertyCount : totalPropertyCount).toLocaleString()}&gt;
+              </span>
+            )}
+          </h1>
+          <div className="header-controls">
+            <select 
+              value={recommendationCount}
+              onChange={(e) => setRecommendationCount(parseInt(e.target.value))}
+              className="recommendation-count-select"
+            >
+              <option value={3}>推薦 3件</option>
+              <option value={5}>推薦 5件</option>
+              <option value={10}>推薦 10件</option>
+            </select>
+            <button onClick={handleNewChat} className="new-chat-button">
+              新しいチャット
+            </button>
+          </div>
+        </div>
       </header>
 
-      <div className="content">
-        {/* 進行状況表示 */}
-        <div className="progress-bar">
-          <div className={`step ${step >= 1 ? 'active' : ''}`}>
-            <span className="step-number">1</span>
-            <span className="step-text">都道府県選択</span>
-          </div>
-          <div className={`step ${step >= 2 ? 'active' : ''}`}>
-            <span className="step-number">2</span>
-            <span className="step-text">駅選択</span>
-          </div>
-          <div className={`step ${step >= 3 ? 'active' : ''}`}>
-            <span className="step-number">3</span>
-            <span className="step-text">物件一覧</span>
-          </div>
-        </div>
-
-        {/* 選択状態表示 */}
-        {selectedPrefecture && (
-          <div className="selection-display">
-            <span className="selection-item">
-              📍 {selectedPrefecture}
-              {selectedStation && <span> → 🚉 {selectedStation}駅</span>}
-            </span>
-          </div>
-        )}
-
-        {isLoading && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>読み込み中...</p>
-          </div>
-        )}
-
-        {/* ステップ1: 都道府県選択 */}
-        {step === 1 && !isLoading && (
-          <div className="prefecture-selection">
-            <h2>📍 都道府県を選択してください</h2>
-            <div className="prefecture-grid">
-              {prefectures.map((prefecture) => (
-                <button
-                  key={prefecture}
-                  className="prefecture-button"
-                  onClick={() => handlePrefectureSelect(prefecture)}
-                >
-                  {prefecture}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ステップ2: 駅選択 */}
-        {step === 2 && !isLoading && (
-          <div className="station-selection">
-            <h2>🚉 {selectedPrefecture}の駅を選択してください</h2>
-            <div className="station-list">
-              {stations.map((station, index) => (
-                <button
-                  key={`${station.name}-${index}`}
-                  className="station-button"
-                  onClick={() => handleStationSelect(station.name)}
-                >
-                  <span className="station-name">{station.name}駅</span>
-                  <span className="property-count">{station.property_count}件</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ステップ3: 物件一覧 */}
-        {step === 3 && searchResult && (
-          <div className="property-results">
-            <h2>🏠 {searchResult.prefecture} {searchResult.station}駅の物件一覧</h2>
-            <p className="result-summary">
-              {searchResult.total_count}件中 {properties.length}件を表示
-            </p>
-            
-            <div className="property-list">
-              {properties.map((property, index) => (
-                <div key={index} className="property-card">
-                  <div className="property-info">
-                    <h3>{property.address}</h3>
-                    <div className="property-details">
-                      <span className="price">💰 {property.price}</span>
-                      <span className="area">📐 {property.area}</span>
-                      <span className="layout">🏠 {property.layout}</span>
-                      <span className="age">📅 {property.age}</span>
-                    </div>
-                    <div className="property-access">
-                      <span>🚉 {property.traffic}</span>
-                    </div>
-                  </div>
-                  {property.url && (
-                    <div className="property-actions">
-                      <button
-                        className="url-button"
-                        onClick={() => window.open(property.url, '_blank')}
-                      >
-                        🔗 詳細を見る
-                      </button>
-                    </div>
-                  )}
+      {/* Main Content */}
+      <main className="app-main">
+        {/* Chat Area */}
+        <div className="chat-container">
+          <div className="messages-area">
+            {messages.map((message) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isLoading={isLoading && message.id === messages[messages.length - 1]?.id}
+              />
+            ))}
+            {isLoading && messages[messages.length - 1]?.type === 'user' && (
+              <div className="typing-indicator">
+                <div className="typing-animation">
+                  <span></span>
+                  <span></span>
+                  <span></span>
                 </div>
-              ))}
-            </div>
+                <span className="typing-text">SumaiAgentが回答を準備中...</span>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-        )}
 
-        {/* 操作ボタン */}
-        <div className="action-buttons">
-          {step > 1 && (
-            <button className="back-button" onClick={handleBack}>
-              ← 戻る
-            </button>
-          )}
-          {step > 1 && (
-            <button className="reset-button" onClick={handleReset}>
-              🔄 最初から
-            </button>
+          {/* Property Recommendations */}
+          {recommendations.length > 0 && (
+            <PropertyRecommendations
+              recommendations={recommendations}
+              onClose={() => setRecommendations([])}
+            />
           )}
         </div>
-      </div>
+      </main>
+
+      {/* Footer with Message Input */}
+      <footer className="app-footer">
+        <div className="footer-content">
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            onFileUpload={handleFileUpload}
+            isLoading={isLoading}
+          />
+        </div>
+      </footer>
     </div>
   )
 }

@@ -1,0 +1,466 @@
+/* Property Recommendations Styles */
+.property-recommendations {
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  animation: recommendationsSlideIn 0.5s ease-out;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for recommendations */
+.property-recommendations::-webkit-scrollbar {
+  width: 8px;
+}
+
+.property-recommendations::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.property-recommendations::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.property-recommendations::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes recommendationsSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recommendations-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 1rem;
+}
+
+.recommendations-header h3 {
+  color: #ffffff;
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.close-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  color: #cccccc;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+/* Grid Layout */
+.recommendations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Property Card */
+.property-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  border-radius: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.property-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.property-card.expanded {
+  border-color: rgba(74, 144, 226, 0.4);
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(255, 255, 255, 0.05));
+}
+
+/* Score Badge */
+.score-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  text-align: center;
+}
+
+.score-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.score-inner {
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.score-label {
+  display: block;
+  font-size: 0.7rem;
+  color: #cccccc;
+  margin-top: 0.3rem;
+  text-align: center;
+}
+
+/* Property Info */
+.property-info {
+  margin-right: 70px;
+}
+
+.property-address {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  line-height: 1.3;
+}
+
+.property-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-icon {
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.detail-label {
+  color: #cccccc;
+  font-size: 0.85rem;
+  min-width: 60px;
+}
+
+.detail-value {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.detail-value.price {
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+/* Similarity Tags */
+.similarity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.similarity-tag {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.6rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  backdrop-filter: blur(10px);
+  animation: tagFadeIn 0.3s ease-out;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
+}
+
+@keyframes tagFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Recommendation Reason */
+.recommendation-reason {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  border-left: 3px solid #4CAF50;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.reason-icon {
+  font-size: 1rem;
+  margin-top: 0.1rem;
+}
+
+.reason-text {
+  color: #f0f0f0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Detailed Scores */
+.detailed-scores {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detailed-scores h5 {
+  color: #ffffff;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  font-weight: 600;
+}
+
+.scores-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.score-name {
+  color: #cccccc;
+  font-size: 0.8rem;
+  min-width: 100px;
+  text-align: left;
+}
+
+.score-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.score-value {
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  min-width: 35px;
+  text-align: right;
+}
+
+/* Action Buttons */
+.property-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.expand-button,
+.url-button {
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.expand-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #cccccc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.expand-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.url-button {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: #ffffff;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.url-button:hover {
+  background: linear-gradient(135deg, #45a049, #3d8b40);
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .property-recommendations {
+    padding: 1rem;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    max-height: 60vh;
+  }
+
+  .recommendations-header h3 {
+    font-size: 1.1rem;
+  }
+
+  .recommendations-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .property-card {
+    padding: 1rem;
+  }
+
+  .property-info {
+    margin-right: 60px;
+  }
+
+  .score-badge {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .score-circle {
+    width: 45px;
+    height: 45px;
+  }
+
+  .score-inner {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+  }
+
+  .property-address {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .detail-row {
+    gap: 0.4rem;
+  }
+
+  .detail-label {
+    min-width: 50px;
+    font-size: 0.8rem;
+  }
+
+  .detail-value {
+    font-size: 0.85rem;
+  }
+
+  .property-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .expand-button,
+  .url-button {
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .recommendations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .property-card {
+    padding: 0.875rem;
+  }
+
+  .property-info {
+    margin-right: 55px;
+  }
+
+  .score-circle {
+    width: 40px;
+    height: 40px;
+  }
+
+  .score-inner {
+    width: 28px;
+    height: 28px;
+    font-size: 0.7rem;
+  }
+
+  .score-label {
+    font-size: 0.65rem;
+  }
+
+  .detailed-scores {
+    margin-top: 1rem;
+    padding-top: 1rem;
+  }
+
+  .score-name {
+    min-width: 80px;
+    font-size: 0.75rem;
+  }
+
+  .scores-grid {
+    gap: 0.6rem;
+  }
+}

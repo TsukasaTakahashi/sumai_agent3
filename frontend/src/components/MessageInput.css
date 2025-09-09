@@ -1,0 +1,250 @@
+/* Message Input Styles */
+.message-input-container {
+  position: relative;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+}
+
+.message-input-container.drag-over {
+  border-color: rgba(74, 144, 226, 0.6);
+  background: rgba(74, 144, 226, 0.1);
+  transform: scale(1.02);
+}
+
+/* Drag Overlay */
+.drag-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(74, 144, 226, 0.2);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border: 2px dashed rgba(74, 144, 226, 0.8);
+}
+
+.drag-message {
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+/* Form */
+.message-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.input-section {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: border-color 0.2s ease;
+}
+
+.input-section:focus-within {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* File Upload Button */
+.file-upload-button {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  color: #cccccc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+}
+
+.file-upload-button:hover:not(:disabled) {
+  background: rgba(74, 144, 226, 0.3);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.file-upload-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Textarea */
+.message-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.75rem;
+  resize: none;
+  outline: none;
+  min-height: 44px;
+  max-height: 150px;
+  font-family: inherit;
+}
+
+.message-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.message-textarea:disabled {
+  opacity: 0.6;
+}
+
+/* Send Button */
+.send-button {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.3);
+}
+
+.send-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #357abd, #2a5f94);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.4);
+}
+
+.send-button:disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.4);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Hints */
+.input-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.input-hints span {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .message-input-container {
+    padding: 1rem;
+    border-radius: 0.875rem;
+  }
+
+  .input-section {
+    gap: 0.5rem;
+    padding: 0.4rem;
+  }
+
+  .file-upload-button,
+  .send-button {
+    padding: 0.625rem;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .file-upload-button svg,
+  .send-button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .message-textarea {
+    font-size: 0.95rem;
+    padding: 0.4rem 0.6rem;
+    min-height: 40px;
+  }
+
+  .input-hints {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .input-hints span {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .message-input-container {
+    padding: 0.875rem;
+  }
+
+  .input-section {
+    gap: 0.4rem;
+    padding: 0.3rem;
+  }
+
+  .file-upload-button,
+  .send-button {
+    padding: 0.5rem;
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .file-upload-button svg,
+  .send-button svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .message-textarea {
+    font-size: 0.9rem;
+    min-height: 36px;
+  }
+
+  .loading-spinner {
+    width: 16px;
+    height: 16px;
+  }
+}

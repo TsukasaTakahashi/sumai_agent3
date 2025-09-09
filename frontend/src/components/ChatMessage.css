@@ -1,0 +1,235 @@
+/* Chat Message Styles */
+.chat-message {
+  display: flex;
+  gap: 1rem;
+  max-width: 100%;
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message.user {
+  flex-direction: row-reverse;
+}
+
+.chat-message.assistant {
+  flex-direction: row;
+}
+
+/* Message Avatar */
+.message-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.user-avatar {
+  background: linear-gradient(135deg, #4a90e2, #357abd);
+  font-size: 1.2rem;
+  color: white;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.assistant-avatar {
+  background: linear-gradient(135deg, #666666, #444444);
+  font-size: 1.2rem;
+  color: white;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Message Content */
+.message-content {
+  flex: 1;
+  max-width: calc(100% - 60px);
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  gap: 1rem;
+}
+
+.message-sender {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #cccccc;
+  letter-spacing: 0.02em;
+}
+
+.message-timestamp {
+  font-size: 0.75rem;
+  color: #888888;
+  white-space: nowrap;
+}
+
+.message-body {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  position: relative;
+}
+
+.chat-message.user .message-body {
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.2), rgba(53, 122, 189, 0.15));
+  border: 1px solid rgba(74, 144, 226, 0.3);
+}
+
+.chat-message.assistant .message-body {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-text {
+  line-height: 1.6;
+  color: #ffffff;
+  word-wrap: break-word;
+  font-size: 0.95rem;
+}
+
+.chat-message.user .message-text {
+  color: #ffffff;
+}
+
+.chat-message.assistant .message-text {
+  color: #f0f0f0;
+}
+
+/* Expand Button */
+.expand-button {
+  display: block;
+  margin-top: 0.75rem;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.expand-button:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Loading Animation */
+.message-loading {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.loading-dots {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  animation: loadingBounce 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+.loading-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes loadingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .chat-message {
+    gap: 0.75rem;
+  }
+
+  .message-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .user-avatar,
+  .assistant-avatar {
+    font-size: 1rem;
+  }
+
+  .message-content {
+    max-width: calc(100% - 50px);
+  }
+
+  .message-body {
+    padding: 0.875rem 1rem;
+    border-radius: 0.875rem;
+  }
+
+  .message-text {
+    font-size: 0.9rem;
+  }
+
+  .message-header {
+    margin-bottom: 0.4rem;
+  }
+
+  .message-sender {
+    font-size: 0.8rem;
+  }
+
+  .message-timestamp {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .message-body {
+    padding: 0.75rem 0.875rem;
+  }
+
+  .message-text {
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+
+  .expand-button {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+  }
+}
