@@ -79,6 +79,8 @@ class PropertyAnalysisAgent:
         - "10万円以下" → price_max: 10
         - "15万円から20万円" → price_min: 15, price_max: 20
         - "予算は3000万円まで" → price_max: 3000
+        - "5000万円" → price_min: 4500, price_max: 5500 (±10%の範囲で検索)
+        - "3000万円程度" → price_min: 2700, price_max: 3300 (±10%の範囲で検索)
 
         間取りの抽出例：
         - "1Kか1DK" → layout: "1K,1DK"
@@ -110,18 +112,41 @@ class PropertyAnalysisAgent:
             r'(\d+)万.*?以下'
         ]
         
-        for pattern in price_patterns:
-            match = re.search(pattern, message)
-            if match:
-                requirements["price_max"] = int(match.group(1))
-                break
+        # 特定価格（レンジ指定）の抽出
+        specific_price_patterns = [
+            r'(\d+)万円',
+            r'予算(\d+)万',
+            r'(\d+)万円程度',
+            r'(\d+)万円くらい'
+        ]
         
-        # 価格範囲抽出
+        # まず価格範囲を確認
         range_pattern = r'(\d+)万.*?(\d+)万'
         range_match = re.search(range_pattern, message)
         if range_match:
             requirements["price_min"] = int(range_match.group(1))
             requirements["price_max"] = int(range_match.group(2))
+        else:
+            # 上限価格の確認
+            price_max_found = False
+            for pattern in price_patterns:
+                match = re.search(pattern, message)
+                if match:
+                    requirements["price_max"] = int(match.group(1))
+                    price_max_found = True
+                    break
+            
+            # 特定価格が指定された場合は±10%のレンジで検索
+            if not price_max_found:
+                for pattern in specific_price_patterns:
+                    match = re.search(pattern, message)
+                    if match:
+                        price = int(match.group(1))
+                        # ±10%のレンジを設定
+                        margin = int(price * 0.1)
+                        requirements["price_min"] = price - margin
+                        requirements["price_max"] = price + margin
+                        break
         
         # 間取り抽出
         layout_patterns = [
@@ -262,8 +287,14 @@ class PropertyAnalysisAgent:
         except Exception as e:
             # フォールバック応答
             conditions_summary = []
-            if new_requirements.get("price_max"):
+            # 価格条件の表示
+            if new_requirements.get("price_min") and new_requirements.get("price_max"):
+                conditions_summary.append(f"予算{new_requirements['price_min']}-{new_requirements['price_max']}万円")
+            elif new_requirements.get("price_max"):
                 conditions_summary.append(f"予算{new_requirements['price_max']}万円以下")
+            elif new_requirements.get("price_min"):
+                conditions_summary.append(f"予算{new_requirements['price_min']}万円以上")
+            
             if new_requirements.get("layout"):
                 conditions_summary.append(f"間取り{new_requirements['layout']}")
             if new_requirements.get("age_max"):

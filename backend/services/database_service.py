@@ -87,6 +87,12 @@ class DatabaseService:
         """
         return await self._execute_async(self._search_properties_sync, criteria)
     
+    async def get_filtered_count(self, criteria: Dict[str, Any]) -> int:
+        """
+        検索条件に基づいて絞り込み件数を取得（実際の物件データは返さない）
+        """
+        return await self._execute_async(self._get_filtered_count_sync, criteria)
+    
     def _search_properties_sync(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         物件検索の同期実装
@@ -153,6 +159,12 @@ class DatabaseService:
                     query_parts.append("AND CAST(REPLACE(years, '年', '') AS INTEGER) <= ?")
                     params.append(criteria["age_max"])
                 
+                # 徒歩時間フィルタ
+                if criteria.get("walk_time_max"):
+                    # traffic1から徒歩時間を抽出してフィルタリング
+                    query_parts.append("AND EXISTS (SELECT 1 WHERE traffic1 LIKE '%徒歩%分%' AND CAST(SUBSTR(traffic1, INSTR(traffic1, '徒歩') + 2, INSTR(SUBSTR(traffic1, INSTR(traffic1, '徒歩') + 2), '分') - 1) AS INTEGER) <= ?)")
+                    params.append(criteria["walk_time_max"])
+                
                 # 物件タイプフィルタ
                 if criteria.get("property_type"):
                     query_parts.append("AND types LIKE ?")
@@ -199,6 +211,94 @@ class DatabaseService:
         except Exception as e:
             print(f"Database search error: {str(e)}")
             return []
+    
+    def _get_filtered_count_sync(self, criteria: Dict[str, Any]) -> int:
+        """
+        絞り込み件数取得の同期実装
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                
+                # COUNT用のSQLクエリを構築（LIMITは除外）
+                query_parts = ["SELECT COUNT(*) FROM BUY_data_url_uniqued WHERE 1=1"]
+                params = []
+                
+                # 地域フィルタ
+                if criteria.get("prefecture"):
+                    query_parts.append("AND pref LIKE ?")
+                    params.append(f"%{criteria['prefecture']}%")
+                
+                if criteria.get("city"):
+                    query_parts.append("AND address LIKE ?")
+                    params.append(f"%{criteria['city']}%")
+                
+                if criteria.get("station"):
+                    query_parts.append("AND station_name LIKE ?")
+                    params.append(f"%{criteria['station']}%")
+                
+                # 価格フィルタ
+                if criteria.get("price_min"):
+                    query_parts.append("AND CAST(mi_price AS REAL) >= ?")
+                    params.append(criteria["price_min"] * 10000)
+                
+                if criteria.get("price_max"):
+                    query_parts.append("AND CAST(mi_price AS REAL) <= ?")
+                    params.append(criteria["price_max"] * 10000)
+                
+                # 間取りフィルタ
+                if criteria.get("layout"):
+                    layout = criteria["layout"]
+                    if "," in layout:
+                        layouts = [l.strip() for l in layout.split(",")]
+                        layout_conditions = " OR ".join(["floor_plan LIKE ?" for _ in layouts])
+                        query_parts.append(f"AND ({layout_conditions})")
+                        params.extend([f"%{l}%" for l in layouts])
+                    elif "+" in layout:
+                        base_layout = layout.replace("+", "")
+                        query_parts.append("AND floor_plan LIKE ?")
+                        params.append(f"%{base_layout}%")
+                    else:
+                        query_parts.append("AND floor_plan LIKE ?")
+                        params.append(f"%{layout}%")
+                
+                # 面積フィルタ
+                if criteria.get("area_min"):
+                    query_parts.append("AND CAST(REPLACE(REPLACE(exclusive_area, 'm²', ''), '㎡', '') AS REAL) >= ?")
+                    params.append(criteria["area_min"])
+                
+                if criteria.get("area_max"):
+                    query_parts.append("AND CAST(REPLACE(REPLACE(exclusive_area, 'm²', ''), '㎡', '') AS REAL) <= ?")
+                    params.append(criteria["area_max"])
+                
+                # 築年数フィルタ
+                if criteria.get("age_max"):
+                    query_parts.append("AND CAST(REPLACE(years, '年', '') AS INTEGER) <= ?")
+                    params.append(criteria["age_max"])
+                
+                # 徒歩時間フィルタ
+                if criteria.get("walk_time_max"):
+                    query_parts.append("AND EXISTS (SELECT 1 WHERE traffic1 LIKE '%徒歩%分%' AND CAST(SUBSTR(traffic1, INSTR(traffic1, '徒歩') + 2, INSTR(SUBSTR(traffic1, INSTR(traffic1, '徒歩') + 2), '分') - 1) AS INTEGER) <= ?)")
+                    params.append(criteria["walk_time_max"])
+                
+                # 物件タイプフィルタ
+                if criteria.get("property_type"):
+                    query_parts.append("AND types LIKE ?")
+                    params.append(f"%{criteria['property_type']}%")
+                
+                # NULL値を除外、価格が0でないものに限定
+                query_parts.append("AND mi_price IS NOT NULL AND mi_price != '' AND mi_price != '0' AND address IS NOT NULL AND address != ''")
+                
+                # クエリ実行
+                query = " ".join(query_parts)
+                cursor.execute(query, params)
+                
+                count = cursor.fetchone()[0]
+                return count
+                
+        except Exception as e:
+            print(f"Database count error: {str(e)}")
+            return 0
     
     async def find_stations_by_name(self, station_name: str) -> List[Dict[str, Any]]:
         """

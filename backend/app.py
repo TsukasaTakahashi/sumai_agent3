@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import uvicorn
 
 from agents.orchestrator_agent import OrchestratorAgent
+from agents.location_disambiguation_agent import LocationDisambiguationAgent
 from services.database_service import DatabaseService
 from services.pdf_service import PDFService
 
@@ -64,6 +65,10 @@ app.add_middleware(
 orchestrator = None
 database_service = None
 pdf_service = None
+location_agent = None
+
+# セッション状態管理
+session_states = {}
 
 def get_orchestrator():
     global orchestrator
@@ -82,6 +87,14 @@ def get_pdf_service():
     if pdf_service is None:
         pdf_service = PDFService()
     return pdf_service
+
+def get_location_agent():
+    global location_agent
+    if location_agent is None:
+        # Google Maps API キーが設定されていれば使用
+        google_maps_key = os.getenv('GOOGLE_MAPS_API_KEY')
+        location_agent = LocationDisambiguationAgent(google_maps_key)
+    return location_agent
 
 # Request/Response models
 class ChatMessage(BaseModel):
@@ -114,6 +127,7 @@ async def health_check():
 async def chat_endpoint(chat_request: ChatMessage):
     """
     Handle chat messages and return conversational responses with property recommendations
+    Using AI Agents for better search accuracy
     """
     try:
         import re
@@ -127,66 +141,182 @@ async def chat_endpoint(chat_request: ChatMessage):
         # セッションIDを生成または使用
         session_id = chat_request.session_id or f"session_{int(time.time())}"
         
+        # セッション状態を取得または初期化
+        if session_id not in session_states:
+            session_states[session_id] = {
+                "cumulative_criteria": {},
+                "search_history": []
+            }
+        
+        session_state = session_states[session_id]
+        
         # データベースから物件検索
         db_service = get_database_service()
         
-        # メッセージから検索条件を抽出（簡易版）
-        search_criteria = {}
+        # AI Agentを使って高精度な条件抽出
+        orchestrator = get_orchestrator()
         
-        # 都道府県抽出
-        prefectures = ['東京', '神奈川', '大阪', '京都', '埼玉', '千葉', '兵庫', '愛知', '福岡', '北海道']
-        for pref in prefectures:
-            if pref in chat_request.message:
-                search_criteria['prefecture'] = pref
-                break
-        
-        # 価格抽出
-        price_match = re.search(r'(\d+)万円以下', chat_request.message)
-        if price_match:
-            search_criteria['price_max'] = int(price_match.group(1))
-        
-        # 間取り抽出
-        layout_match = re.search(r'([1-9][SLDK]+)', chat_request.message)
-        if layout_match:
-            search_criteria['layout'] = layout_match.group(1)
-        
-        # 駅名抽出と曖昧さ解決
-        station_match = re.search(r'([^駅\s]+)駅', chat_request.message)
-        if station_match:
-            station_name = station_match.group(1)
+        # PropertyAnalysisAgentで自然言語を構造化データに変換
+        try:
+            analysis_result = await orchestrator.property_analysis_agent.extract_requirements(
+                chat_request.message, 
+                session_state["cumulative_criteria"]  # 累積条件を渡す
+            )
+            extracted_requirements = analysis_result.get("requirements", {})
             
-            # 駅の曖昧さをチェック
-            station_candidates = await db_service.find_stations_by_name(station_name)
+            # 抽出された条件を累積条件にマージ
+            for key, value in extracted_requirements.items():
+                if value is not None:
+                    session_state["cumulative_criteria"][key] = value
             
-            if len(station_candidates) > 1 and 'prefecture' not in search_criteria:
-                # 複数の候補がある場合、選択を促すレスポンスを返す
-                candidate_list = []
-                for i, candidate in enumerate(station_candidates[:5], 1):
-                    prefecture = candidate.get('prefecture', '')
-                    city = candidate.get('city', '')
-                    count = candidate.get('property_count', 0)
-                    candidate_list.append(f"{i}. {prefecture} {city} ({count}件)")
+            # 累積条件を検索条件に変換
+            search_criteria = {}
+            
+            # 累積条件を全て適用
+            cumulative = session_state["cumulative_criteria"]
+            
+            # 価格条件
+            if cumulative.get('price_max'):
+                search_criteria['price_max'] = cumulative['price_max']
+            if cumulative.get('price_min'):
+                search_criteria['price_min'] = cumulative['price_min']
+            
+            # 間取り条件
+            if cumulative.get('layout'):
+                search_criteria['layout'] = cumulative['layout']
+            
+            # 築年数条件
+            if cumulative.get('age_max'):
+                search_criteria['age_max'] = cumulative['age_max']
+            
+            # 徒歩時間条件
+            if cumulative.get('walk_time_max'):
+                search_criteria['walk_time_max'] = cumulative['walk_time_max']
+            
+            # 面積条件
+            if cumulative.get('area_min'):
+                search_criteria['area_min'] = cumulative['area_min']
+            if cumulative.get('area_max'):
+                search_criteria['area_max'] = cumulative['area_max']
+            
+            # 地域条件
+            if cumulative.get('prefecture'):
+                search_criteria['prefecture'] = cumulative['prefecture']
+            if cumulative.get('city'):
+                search_criteria['city'] = cumulative['city']
+            if cumulative.get('station'):
+                search_criteria['station'] = cumulative['station']
                 
-                disambiguation_response = f"「{station_name}駅」は複数の地域にございます。どちらの地域をご希望でしょうか？\n\n" + "\n".join(candidate_list) + "\n\n数字または「東京都の新宿駅」のように詳しく教えてください。"
-                
+        except Exception as e:
+            print(f"AI Agent extraction error: {str(e)}, falling back to regex")
+            # フォールバック：正規表現ベースの抽出
+            search_criteria = {}
+            
+            # 都道府県抽出
+            prefectures = ['東京', '神奈川', '大阪', '京都', '埼玉', '千葉', '兵庫', '愛知', '福岡', '北海道']
+            for pref in prefectures:
+                if pref in chat_request.message:
+                    search_criteria['prefecture'] = pref
+                    break
+            
+            # 価格抽出
+            price_match = re.search(r'(\d+)万円以下', chat_request.message)
+            if price_match:
+                search_criteria['price_max'] = int(price_match.group(1))
+            
+            # 間取り抽出
+            layout_match = re.search(r'([1-9][SLDK]+)', chat_request.message)
+            if layout_match:
+                search_criteria['layout'] = layout_match.group(1)
+        
+        # LocationAgentを使って地域・駅名の処理
+        try:
+            location_result = await orchestrator.location_agent.process_location_inquiry(
+                chat_request.message,
+                search_criteria
+            )
+            
+            # 地域情報を検索条件に追加
+            if location_result.get('is_specific'):
+                location_info = location_result.get('location_info', {})
+                if location_info.get('prefecture'):
+                    search_criteria['prefecture'] = location_info['prefecture'].replace('県', '').replace('都', '').replace('府', '')
+                if location_info.get('station'):
+                    search_criteria['station'] = location_info['station']
+                if location_info.get('city'):
+                    search_criteria['city'] = location_info['city']
+            elif location_result.get('candidates'):
+                # 曖昧さがある場合はレスポンスを返す
                 return ChatResponse(
-                    response=disambiguation_response,
+                    response=location_result.get('response', '地域を特定できませんでした。'),
                     session_id=session_id,
                     recommendations=[],
                     is_final=False
                 )
-            elif len(station_candidates) == 1:
-                # 一意に特定できる場合
-                candidate = station_candidates[0]
-                search_criteria['station'] = station_name
-                if not search_criteria.get('prefecture'):
-                    search_criteria['prefecture'] = candidate.get('prefecture', '').replace('県', '').replace('都', '').replace('府', '')
-            else:
-                search_criteria['station'] = station_name
+                
+        except Exception as e:
+            print(f"LocationAgent error: {str(e)}, falling back to regex")
+            # フォールバック：正規表現ベースの駅名抽出
+            station_match = re.search(r'([^駅\s]+)駅', chat_request.message)
+            if station_match:
+                station_name = station_match.group(1)
+                
+                # 駅の曖昧さをチェック
+                station_candidates = await db_service.find_stations_by_name(station_name)
+                
+                if len(station_candidates) > 1 and 'prefecture' not in search_criteria:
+                    # 複数の候補がある場合、選択を促すレスポンスを返す
+                    candidate_list = []
+                    for i, candidate in enumerate(station_candidates[:5], 1):
+                        prefecture = candidate.get('prefecture', '')
+                        city = candidate.get('city', '')
+                        count = candidate.get('property_count', 0)
+                        candidate_list.append(f"{i}. {prefecture} {city} ({count}件)")
+                    
+                    disambiguation_response = f"「{station_name}駅」は複数の地域にございます。どちらの地域をご希望でしょうか？\n\n" + "\n".join(candidate_list) + "\n\n数字または「東京都の新宿駅」のように詳しく教えてください。"
+                    
+                    return ChatResponse(
+                        response=disambiguation_response,
+                        session_id=session_id,
+                        recommendations=[],
+                        is_final=False
+                    )
+                elif len(station_candidates) == 1:
+                    # 一意に特定できる場合
+                    candidate = station_candidates[0]
+                    search_criteria['station'] = station_name
+                    if not search_criteria.get('prefecture'):
+                        search_criteria['prefecture'] = candidate.get('prefecture', '').replace('県', '').replace('都', '').replace('府', '')
+                else:
+                    search_criteria['station'] = station_name
+        
+        # 都道府県の抽出（AI Agentが抽出できなかった場合のフォールバック）
+        if not search_criteria.get('prefecture') and not session_state["cumulative_criteria"].get('prefecture'):
+            prefectures = ['東京', '神奈川', '大阪', '京都', '埼玉', '千葉', '兵庫', '愛知', '福岡', '北海道']
+            for pref in prefectures:
+                if pref in chat_request.message:
+                    search_criteria['prefecture'] = pref
+                    session_state["cumulative_criteria"]['prefecture'] = pref
+                    break
+        
+        # 市区町村の抽出（フォールバック）
+        if not search_criteria.get('city') and not session_state["cumulative_criteria"].get('city'):
+            cities = ['川崎', '横浜', '新宿', '渋谷', '池袋', '品川', '大阪', '京都', '札幌', '仙台']
+            for city in cities:
+                if city in chat_request.message and city not in prefectures:
+                    search_criteria['city'] = city
+                    session_state["cumulative_criteria"]["city"] = city
+                    break
         
         # デフォルト検索条件
         if not search_criteria:
             search_criteria = {'prefecture': '東京', 'price_max': 5000}
+        
+        # デバッグ出力
+        print(f"検索条件: {search_criteria}")
+        
+        # 絞り込み件数を取得（実際の表示用）
+        total_filtered_count = await db_service.get_filtered_count(search_criteria)
         
         # 重複除去を考慮して多めに取得
         original_limit = chat_request.recommendation_count
@@ -198,8 +328,37 @@ async def chat_endpoint(chat_request: ChatMessage):
         # 重複除去処理
         properties = remove_duplicate_properties(properties)
         
+        # 位置曖昧性チェック（川崎などの地名で検索した場合）
+        location_agent = get_location_agent()
+        location_terms = location_agent.extract_location_from_query(chat_request.message)
+        
+        if location_terms and len(properties) > 0:
+            # 住所リストを抽出
+            addresses = [prop.get('address', '') for prop in properties if prop.get('address')]
+            
+            # 曖昧性チェック実行
+            for term in location_terms:
+                ambiguity_result = await location_agent.analyze_location_ambiguity(term, addresses)
+                
+                if ambiguity_result.get('needs_clarification'):
+                    # 曖昧性があるため問い直し
+                    return ChatResponse(
+                        response=ambiguity_result['message'],
+                        session_id=session_id,
+                        recommendations=[],
+                        is_final=False,
+                        filtered_count=total_filtered_count
+                    )
+        
         # 最終的に必要な件数に制限
         properties = properties[:original_limit]
+        
+        # セッション履歴に記録
+        session_state["search_history"].append({
+            "query": chat_request.message,
+            "criteria": search_criteria.copy(),
+            "total_count": total_filtered_count
+        })
         
         # OpenAI APIで応答生成
         headers = {
@@ -302,7 +461,7 @@ async def chat_endpoint(chat_request: ChatMessage):
                 session_id=session_id,
                 recommendations=recommendations,
                 is_final=len(recommendations) > 0,
-                filtered_count=len(properties)  # 絞り込み後の件数を追加
+                filtered_count=total_filtered_count  # 全体の絞り込み件数を追加
             )
         else:
             # OpenAI APIエラー時も推薦リストを返す
@@ -325,11 +484,11 @@ async def chat_endpoint(chat_request: ChatMessage):
                 })
             
             return ChatResponse(
-                response=f"検索条件「{conditions_text}」で{property_count}件の物件が見つかりました。",
+                response=f"検索条件「{conditions_text}」で{total_filtered_count}件の物件が見つかりました。",
                 session_id=session_id,
                 recommendations=recommendations,
                 is_final=True,
-                filtered_count=property_count
+                filtered_count=total_filtered_count
             )
     
     except Exception as e:
@@ -389,7 +548,13 @@ async def clear_session(session_id: str):
     Clear a specific session's data
     """
     try:
+        # オーケストレーターのセッションをクリア
         await get_orchestrator().clear_session(session_id)
+        
+        # ローカルセッション状態もクリア
+        if session_id in session_states:
+            del session_states[session_id]
+        
         return {"message": f"Session {session_id} cleared successfully"}
     
     except Exception as e:
